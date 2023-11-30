@@ -56,6 +56,7 @@ time_to_first_response = dbc.Card(
                 ),
                 dbc.Popover(
                     [
+                        dbc.PopoverHeader("Graph Info:"),
                         dbc.PopoverBody(
                             """         This metric mesures the amount of time between an activity requiring attention arising, 
                                         and the first response to it. Time to first response is imortant because it can reflect
