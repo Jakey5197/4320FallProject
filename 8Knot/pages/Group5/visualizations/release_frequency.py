@@ -58,7 +58,14 @@ release_frequency = dbc.Card(
                 dbc.Popover(
                     [
                         dbc.PopoverHeader("Graph Info:"),
-                        dbc.PopoverBody("Placeholder"),
+                        dbc.PopoverBody(
+                            """         This metric tracks the frequency of project software or artifact releases over time.
+                                        This includes both large and small releases. These releases are important to consumers 
+                                        as they are installed by users to gain access to bug fixes and new features, as well
+                                        as having the capacity to increase accessibility. Delays in releases can be very
+                                        detrimental to security and accessibility, making it an important metric to monitor.
+                                        A higher frequency of releases leads to a better user experience."""
+                            ),
                     ],
                     id=f"popover-{PAGE}-{VIZ_ID}",
                     target=f"popover-target-{PAGE}-{VIZ_ID}",
