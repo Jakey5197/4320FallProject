@@ -19,7 +19,6 @@ NOTE: VARIABLES TO CHANGE:
 
 (5) CONTEXT OF GRAPH
 (6) IDs of Dash components
-(6) NAME_OF_VISUALIZATION_graph
 (7) COLUMN_WITH_DATETIME
 (8) COLUMN_WITH_DATETIME
 (9) COLUMN_TO_SORT_BY
@@ -112,46 +111,6 @@ change_request_closure_ratio = dbc.Card(
                             ],
                             align="center",
                         ),
-                        # TODO: ADD IN IF ADDITIONAL PARAMETERS FOR GRAPH, REMOVE IF NOT
-                        """ format dbc.Inputs, including dbc.Alert if needed
-                                dbc.Label(
-                                    "TITLE_OF_ADDITIONAL_PARAMETER:",
-                                    html_for=f"component-identifier-{PAGE}-{VIZ_ID}",
-                                    width={"size": "auto"},
-                                ),
-                                dbc.Col(
-                                    dbc.Input(
-                                        id=f"component-identifier-{PAGE}-{VIZ_ID}",,
-                                        type="number",
-                                        min=1,
-                                        max=120,
-                                        step=1,
-                                        value=7,
-                                    ),
-                                    className="me-2",
-                                    width=2,
-                                ),
-                                dbc.Alert(
-                                    children="Please ensure that 'PARAMETER' is less than 'PARAMETER'",
-                                    id=f"component-identifier-{PAGE}-{VIZ_ID}",
-                                    dismissable=True,
-                                    fade=False,
-                                    is_open=False,
-                                    color="warning",
-                                ),
-                        """
-                        """ format for dcc.DatePickerRange:
-                                dbc.Col(
-                                    dcc.DatePickerRange(
-                                        id=f"component-identifier-{PAGE}-{VIZ_ID}",
-                                        min_date_allowed=dt.date(2005, 1, 1),
-                                        max_date_allowed=dt.date.today(),
-                                        clearable=True,
-                                    ),
-                                    width="auto",
-                                ),
-
-                        """,
                     ]
                 ),
             ]
@@ -216,10 +175,11 @@ def process_data(df: pd.DataFrame, interval):
 
     # convert to datetime objects rather than strings
     # ADD ANY OTHER COLUMNS WITH DATETIME
-    df["COLUMN_WITH_DATETIME"] = pd.to_datetime(df["COLUMN_WITH_DATETIME"], utc=True)
-
+    df["pr_created_at"] = pd.to_datetime(df["pr_created_at"], utc=True)
+    df["pr_closed_at"] = pd.to_datetime(df["pr_closed_at"], utc=True)
+    df["pr_merged_at"] = pd.to_datetime(df["pr_merged_at"], utc=True)
     # order values chronologically by COLUMN_TO_SORT_BY date
-    df = df.sort_values(by="COLUMN_TO_SORT_BY", axis=0, ascending=True)
+    #df = df.sort_values(by="COLUMN_TO_SORT_BY", axis=0, ascending=True)
 
     """LOOK AT OTHER VISUALIZATIONS TO SEE IF ANY HAVE A SIMILAR DATA PROCESS"""
 
