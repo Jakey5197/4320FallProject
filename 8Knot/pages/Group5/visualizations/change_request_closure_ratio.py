@@ -61,7 +61,14 @@ change_request_closure_ratio = dbc.Card(
                 dbc.Popover(
                     [
                         dbc.PopoverHeader("Graph Info:"),
-                        dbc.PopoverBody("INSERT CONTEXT OF GRAPH HERE"),
+                        dbc.PopoverBody(
+                            """         The pourpose of this metric is to monitor if the change requests submitted
+                                        are being delt with efficiently by ratioing the number of open change requests
+                                        in a specified amount of time with the number of chane requests that have been closed
+                                        in that same amount of time. The number of closed change requests is divided by the
+                                        number of open pull requests. Having change requests delt with in an efficient
+                                        manner helps to decrease merge conflicts."""
+                            ),
                     ],
                     id=f"popover-{PAGE}-{VIZ_ID}",
                     target=f"popover-target-{PAGE}-{VIZ_ID}",
