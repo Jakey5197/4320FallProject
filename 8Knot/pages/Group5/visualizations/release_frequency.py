@@ -189,7 +189,7 @@ def create_figure(df: pd.DataFrame, interval):
     # graph generation
     fig = go.Figure(
         [
-            go.Scatter(x=df['release_published_at'], y=([1]*len(df)), mode='markers')
+            go.Scatter(x=df['release_published_at'], y=([1]*len(df)), mode='markers', text=df['release_published_at'].dt.strftime('%Y-%m-%d'))
         ]
     )
 
