@@ -30,9 +30,11 @@ time_to_first_response = dbc.Card(
                     [
                         dbc.PopoverHeader("Graph Info:"),
                         dbc.PopoverBody(
-                            """
-                            Placeholder
-                            """
+                            """         This metric mesures the amount of time between an activity requiring attention arising, 
+                                        and the first response to it. Time to first response is imortant because it can reflect
+                                        how active a project comminuty currently is. Mesured here is response time across various activities
+                                        including posts, emails, issues, and more. Longer response times indicates a community becoming inactive, 
+                                        while a shorter response time indicates and facilitates further communication within a project."""
                         ),
                     ],
                     id=f"popover-{PAGE}-{VIZ_ID}",
