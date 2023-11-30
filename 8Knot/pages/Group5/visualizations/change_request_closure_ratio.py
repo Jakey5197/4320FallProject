@@ -182,9 +182,9 @@ def process_data(df: pd.DataFrame, interval):
 
     # convert to datetime objects rather than strings
     # ADD ANY OTHER COLUMNS WITH DATETIME
-    df["pr_created_at"] = pd.to_datetime(df["pr_created_at"], utc=True)
-    df["pr_closed_at"] = pd.to_datetime(df["pr_closed_at"], utc=True)
-    df["pr_merged_at"] = pd.to_datetime(df["pr_merged_at"], utc=True)
+    df["created"] = pd.to_datetime(df["created"], utc=True)
+    df["closed"] = pd.to_datetime(df["closed"], utc=True)
+    df["merged"] = pd.to_datetime(df["merged"], utc=True)
     # order values chronologically by COLUMN_TO_SORT_BY date
     #df = df.sort_values(by="COLUMN_TO_SORT_BY", axis=0, ascending=True)
 
