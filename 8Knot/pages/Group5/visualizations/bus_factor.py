@@ -27,6 +27,7 @@ bus_factor = dbc.Card(
         dbc.CardBody(
             [
                 html.H3(
+                    
                     id=f"graph-title-{PAGE}-{VIZ_ID}",
                     className="card-title",
                     style={"textAlign": "center"},
@@ -36,15 +37,15 @@ bus_factor = dbc.Card(
                         dbc.PopoverHeader("Graph Info:"),
                         dbc.PopoverBody(
                             """
-                                        This analysis is also referred to as "Bus Factor". For each action type, visualizes
-                                        the smallest group of contributors who account for a user-inputted percentage
-                                        of the total number of contributions. By default, the threshold is set to 50%.
+                                        This analysis is referred to as Bus Factor. It visualizes
+                                        the smallest group of contributors who account for 50%
+                                        of the total number of commits. The threshold is set to 50%.
                                         Thus, the visualization will show the number of contributors who account for
-                                        50% of all contributions made, per action type. Suppose two individuals authored
-                                        50% of the commits, then the contributor prolificacy is 2. Analysis is done over
+                                        50% of all contributions made. Suppose two individuals authored
+                                        50% of the commits, then the bus factor is 2. Analysis is done over
                                         a time range, and snapshots of the time range are set according to window width
                                         and step size. By default, window width and step size are set to 6 months.
-                                        Thus, contributor prolificacy is calculated for each non-overlapping 6-month
+                                        Thus, bus factor is calculated for each non-overlapping 6-month
                                         snapshot of the time range provided. Optionally, contributors who have 'bot' or
                                         any custom keyword(s) in their logins can be filtered out. Please note that gaps
                                         in the graph indicate that no contributions of a specific action type(s) were made
@@ -76,7 +77,7 @@ bus_factor = dbc.Card(
                                             min=50,
                                             max=50,
                                             value=50,
-                                            marks={i: f"{i}%" for i in range(10, 100, 5)},
+                                            marks={i: f"{i}%" for i in range(50, 50, 5)},
                                         ),
                                     ],
                                     className="me-2",
@@ -231,7 +232,7 @@ def graph_title(window_width):
     ],
     background=True,
 )
-def create_contrib_prolificacy_over_time_graph2(
+def create_contrib_prolificacy_over_time_graph(
     repolist, patterns, threshold, window_width, step_size, start_date, end_date
 ):
     # main function for all data pre processing
@@ -255,15 +256,15 @@ def create_contrib_prolificacy_over_time_graph2(
     if step_size > window_width:
         return dash.no_update, True
 
-    df_final = process_data2(df, patterns, threshold, window_width, step_size, start_date, end_date)
+    df_final = process_data(df, patterns, threshold, window_width, step_size, start_date, end_date)
 
-    fig = create_figure2(df_final, threshold, step_size)
+    fig = create_figure(df_final, threshold, step_size)
 
     logging.warning(f"{VIZ_ID} - END - {time.perf_counter() - start}")
     return fig, False
 
 
-def process_data2(df, patterns, threshold, window_width, step_size, start_date, end_date):
+def process_data(df, patterns, threshold, window_width, step_size, start_date, end_date):
 
     # convert to datetime objects rather than strings
     df["created_at"] = pd.to_datetime(df["created_at"], utc=True)
@@ -304,14 +305,14 @@ def process_data2(df, patterns, threshold, window_width, step_size, start_date, 
         df_final["PR Review"],
     ) = zip(
         *df_final.apply(
-            lambda row: cntrb_prolificacy_over_time2(df, row.period_from, row.period_to, window_width, threshold), axis=1
+            lambda row: cntrb_prolificacy_over_time(df, row.period_from, row.period_to, window_width, threshold), axis=1
         )
     )
 
     return df_final
 
 
-def create_figure2(df_final, threshold, step_size):
+def create_figure(df_final, threshold, step_size):
     # create custom data to update the hovertemplate with the action type and start and end dates of a given time window in addition to the lottery factor
     # make a nested list of plural action types so that it is gramatically correct in the updated hover info eg. Commit -> Commits and PR Opened -> PRs Opened
     action_types = [
@@ -434,7 +435,7 @@ def create_figure2(df_final, threshold, step_size):
     return fig
 
 
-def cntrb_prolificacy_over_time2(df, period_from, period_to, window_width, threshold):
+def cntrb_prolificacy_over_time(df, period_from, period_to, window_width, threshold):
     # subset df such that the rows correspond to the window of time defined by period from and period to
     time_mask = (df["created_at"] >= period_from) & (df["created_at"] <= period_to)
     df_in_range = df.loc[time_mask]
@@ -457,23 +458,22 @@ def cntrb_prolificacy_over_time2(df, period_from, period_to, window_width, thres
     # pivot df such that the column names correspond to the different action types, index is the cntrb_ids, and the values are the number of contributions of each contributor
     df_count_cntrbs = df_count_cntrbs.pivot(index="cntrb_id", columns="Action", values="count")
 
-    commit = calc_lottery_factor2(df_count_cntrbs, "Commit", threshold)
-    #issueOpened = calc_lottery_factor2(df_count_cntrbs, "Issue Opened", threshold)
-    #issueComment = calc_lottery_factor2(df_count_cntrbs, "Issue Comment", threshold)
-    #issueClosed = calc_lottery_factor2(df_count_cntrbs, "Issue Closed", threshold)
-    #prOpened = calc_lottery_factor2(df_count_cntrbs, "PR Opened", threshold)
-    #prReview = calc_lottery_factor2(df_count_cntrbs, "PR Review", threshold)
-    #prComment = calc_lottery_factor2(df_count_cntrbs, "PR Comment", threshold)
+    commit = calc_lottery_factor(df_count_cntrbs, "Commit", threshold)
+    #issueOpened = calc_lottery_factor(df_count_cntrbs, "Issue Opened", threshold)
+    #issueComment = calc_lottery_factor(df_count_cntrbs, "Issue Comment", threshold)
+    #issueClosed = calc_lottery_factor(df_count_cntrbs, "Issue Closed", threshold)
+    #prOpened = calc_lottery_factor(df_count_cntrbs, "PR Opened", threshold)
+    #prReview = calc_lottery_factor(df_count_cntrbs, "PR Review", threshold)
+    #prComment = calc_lottery_factor(df_count_cntrbs, "PR Comment", threshold)
 
     return commit, issueOpened, issueComment, issueClosed, prOpened, prReview, prComment
 
 
-def calc_lottery_factor2(df, action_type, threshold):
+def calc_lottery_factor(df, action_type, threshold):
     # if the df is empty return None
     if df.empty:
         return None
-    if action_type != "Commit":
-        return None
+
     # if the specified action type is not in the dfs' cols return None
     if action_type not in df.columns:
         return None
