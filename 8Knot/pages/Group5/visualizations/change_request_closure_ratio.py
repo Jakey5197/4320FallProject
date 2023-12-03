@@ -176,30 +176,41 @@ def change_request_closure_ratio_graph(repolist, interval):
 
 
 def process_data(df: pd.DataFrame, interval):
-    """Implement your custom data-processing logic in this function.
-    The output of this function is the data you intend to create a visualization with,
-    requiring no further processing."""
-
-    # convert to datetime objects rather than strings
-    # ADD ANY OTHER COLUMNS WITH DATETIME
+    # Convert to datetime objects rather than strings
     df["created"] = pd.to_datetime(df["created"], utc=True)
     df["closed"] = pd.to_datetime(df["closed"], utc=True)
-    df["merged"] = pd.to_datetime(df["merged"], utc=True)
-    # order values chronologically by COLUMN_TO_SORT_BY date
-    #df = df.sort_values(by="COLUMN_TO_SORT_BY", axis=0, ascending=True)
 
-    """LOOK AT OTHER VISUALIZATIONS TO SEE IF ANY HAVE A SIMILAR DATA PROCESS"""
+    # Order values chronologically by created date
+    df = df.sort_values(by="created", axis=0, ascending=True)
 
-    return df
+    # Group by repo_id and calculate the number of open and closed requests
+    df_grouped = df.groupby(["id", pd.Grouper(key="created", freq=interval)]).agg(
+        open_requests=('created', 'count'),
+        closed_requests=('closed', 'count')
+    ).reset_index()
+
+    # Calculate the closure ratio
+    df_grouped["closure_ratio"] = df_grouped["closed_requests"] / df_grouped["open_requests"]
+
+    return df_grouped
 
 
 def create_figure(df: pd.DataFrame, interval):
-    # time values for graph
-    x_r, x_name, hover, period = get_graph_time_values(interval)
-
-    # graph generation
+    # Create a line graph with plotly
     fig = go.Figure()
 
-    """LOOK AT OTHER VISUALIZATIONS TO SEE IF ANY HAVE A SIMILAR GRAPH"""
+    # Add a trace for each repo
+    for repo_id in df["id"].unique():
+        df_repo = df[df["id"] == repo_id]
+        fig.add_trace(go.Scatter(x=df_repo["created"], y=df_repo["closure_ratio"], mode='lines', name=f'Repo {repo_id}'))
+
+    # Set the layout
+    fig.update_layout(
+        xaxis_title="Time",
+        yaxis_title="Change Request Closure Ratio",
+        title=f"Change Request Closure Ratio over Time ({interval})",
+        hovermode="x"
+    )
 
     return fig
+
