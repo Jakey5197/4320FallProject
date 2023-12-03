@@ -37,11 +37,11 @@ def TTFRQ_query(self, repos):
 
     query_string = f"""
                     SELECT i.created_at, i.closed_at, r.repo_id as id 
-                    FROM issues i,repo r
-                    WHERE r.repo_id = i.repo_id AND r.repo_id = 1 AND closed_at IS NOT null AND repo_id in ({str(repos)[1:-1]})
+                    FROM issues AS i,repo AS r
+                    WHERE r.repo_id = i.repo_id AND r.repo_id = 1 AND closed_at IS NOT null
                     ORDER BY i.created_at
                 """
-
+# AND repo_id in ({str(repos)[1:-1]})
     try:
         dbm = AugurManager()
         engine = dbm.get_engine()

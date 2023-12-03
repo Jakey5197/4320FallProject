@@ -1,66 +1,50 @@
 from dash import html, dcc, callback
 import dash
+from dash import dcc
 import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from dash.dependencies import Input, Output, State
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 import logging
 from dateutil.relativedelta import *  # type: ignore
 import plotly.express as px
 from pages.utils.graph_utils import get_graph_time_values, color_seq
-from queries.ttfr_query import TTFRQ_query as ttfrq
+from queries.contributors_query import contributors_query as ctq
 import io
 from cache_manager.cache_manager import CacheManager as cm
 from pages.utils.job_utils import nodata_graph
 import time
+import datetime as dt
+from scipy import stats
 
-"""
-NOTE: VARIABLES TO CHANGE:
-(8) COLUMN_WITH_DATETIME
-(9) COLUMN_TO_SORT_BY
-(10) Comments before callbacks
-(11) QUERY_USED, QUERY_NAME, QUERY_INITIALS
-
-NOTE: IMPORTING A VISUALIZATION INTO A PAGE
-(1) Include the visualization file in the visualization folder for the respective page
-(2) Import the visualization into the page_name.py file using "from .visualizations.visualization_file_name import gc_visualization_name"
-(3) Add the card into a column in a row on the page
-
-NOTE: ADDITIONAL DASH COMPONENTS FOR USER GRAPH CUSTOMIZATIONS
-
-If you add Dash components (ie dbc.Input, dbc.RadioItems, dcc.DatePickerRange...) the ids, html_for, and targets should be in the
-following format: f"component-identifier-{PAGE}-{VIZ_ID}"
-
-NOTE: If you change or add a new query, you need to do "docker system prune -af" before building again
-
-NOTE: If you use an alert or take code from a visualization that uses one, make sure to update returns accordingly in the NAME_OF_VISUALIZATION_graph
-
-For more information, check out the new_vis_guidance.md
-"""
-
-
-# TODO: Remove unused imports and edit strings and variables in all CAPS
-# TODO: Remove comments specific for the template
-
-PAGE = "Group5"  # EDIT FOR CURRENT PAGE
-VIZ_ID = "time_to_first_response"  # UNIQUE IDENTIFIER FOR VIZUALIZATION
+PAGE = "Group5"
+VIZ_ID = "time_to_first_response"
 
 time_to_first_response = dbc.Card(
     [
         dbc.CardBody(
             [
                 html.H3(
-                    "Time To First Response",
+                    id=f"graph-title-{PAGE}-{VIZ_ID}",
                     className="card-title",
                     style={"textAlign": "center"},
                 ),
                 dbc.Popover(
                     [
                         dbc.PopoverHeader("Graph Info:"),
-                        dbc.PopoverBody("Graph of time time between commit and response"),
+                        dbc.PopoverBody(
+                            """         This metric tracks the frequency of project software or artifact releases over time.
+                                        This includes both large and small releases. These releases are important to consumers 
+                                        as they are installed by users to gain access to bug fixes and new features, as well
+                                        as having the capacity to increase accessibility. Delays in releases can be very
+                                        detrimental to security and accessibility, making it an important metric to monitor.
+                                        A higher frequency of releases leads to a better user experience."""
+                        ),
                     ],
                     id=f"popover-{PAGE}-{VIZ_ID}",
-                    target=f"popover-target-{PAGE}-{VIZ_ID}",
+                    target=f"popover-target-{PAGE}-{VIZ_ID}",  # needs to be the same as dbc.Button id
                     placement="top",
                     is_open=False,
                 ),
@@ -72,40 +56,127 @@ time_to_first_response = dbc.Card(
                         dbc.Row(
                             [
                                 dbc.Label(
-                                    "Date Interval:",
-                                    html_for=f"date-radio-{PAGE}-{VIZ_ID}",
+                                    "Threshold:",
+                                    html_for=f"threshold-{PAGE}-{VIZ_ID}",
                                     width="auto",
                                 ),
                                 dbc.Col(
                                     [
-                                        dbc.RadioItems(
-                                            id=f"date-radio-{PAGE}-{VIZ_ID}",
-                                            options=[
-                                                {
-                                                    "label": "Trend",
-                                                    "value": "D",
-                                                },  # TREND IF LINE, DAY IF NOT
-                                                # {"label": "Week","value": "W",}, UNCOMMENT IF APPLICABLE
-                                                {"label": "Month", "value": "M"},
-                                                {"label": "Year", "value": "Y"},
-                                            ],
-                                            value="M",
-                                            inline=True,
+                                        dcc.Slider(
+                                            id=f"threshold-{PAGE}-{VIZ_ID}",
+                                            min=100,
+                                            max=100,
+                                            value=100,
+                                            marks={i: f"{i}%" for i in range(10, 100, 5)},
                                         ),
-                                    ]
+                                    ],
+                                    className="me-2",
+                                    width=10,
+                                ),
+                            ],
+                            align="center",
+                        ),
+                        dbc.Row(
+                            [
+                                dbc.Label(
+                                    "Window Width:",
+                                    html_for=f"window-width-{PAGE}-{VIZ_ID}",
+                                    width="auto",
                                 ),
                                 dbc.Col(
-                                    dbc.Button(
-                                        "About Graph",
-                                        id=f"popover-target-{PAGE}-{VIZ_ID}",
-                                        color="secondary",
+                                    dbc.Input(
+                                        id=f"window-width-{PAGE}-{VIZ_ID}",
+                                        type="number",
+                                        min=1,
+                                        max=12,
+                                        step=1,
+                                        value=6,
                                         size="sm",
                                     ),
+                                    className="me-2",
+                                    width=2,
+                                ),
+                                dbc.Label(
+                                    "Step Size:",
+                                    html_for=f"step-size-{PAGE}-{VIZ_ID}",
+                                    width="auto",
+                                ),
+                                dbc.Col(
+                                    dbc.Input(
+                                        id=f"step-size-{PAGE}-{VIZ_ID}",
+                                        type="number",
+                                        min=1,
+                                        max=12,
+                                        step=1,
+                                        value=6,
+                                        size="sm",
+                                    ),
+                                    className="me-2",
+                                    width=2,
+                                ),
+                                dbc.Alert(
+                                    children="Please ensure that 'Step Size' is less than or equal to 'Window Size'",
+                                    id=f"check-alert-{PAGE}-{VIZ_ID}",
+                                    dismissable=True,
+                                    fade=False,
+                                    is_open=False,
+                                    color="warning",
+                                ),
+                            ],
+                            align="center",
+                        ),
+                        dbc.Row(
+                            [
+                                dbc.Label(
+                                    "Filter Out Contributors with Keyword(s) in Login:",
+                                    html_for=f"patterns-{PAGE}-{VIZ_ID}",
+                                    width="auto",
+                                ),
+                                dbc.Col(
+                                    [
+                                        dmc.MultiSelect(
+                                            id=f"patterns-{PAGE}-{VIZ_ID}",
+                                            placeholder="Bot filter values",
+                                            data=[
+                                                {"value": "bot", "label": "bot"},
+                                            ],
+                                            classNames={"values": "dmc-multiselect-custom"},
+                                            creatable=True,
+                                            searchable=True,
+                                        ),
+                                    ],
+                                    className="me-2",
+                                ),
+                            ],
+                            align="center",
+                        ),
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    dcc.DatePickerRange(
+                                        id=f"date-picker-range-{PAGE}-{VIZ_ID}",
+                                        min_date_allowed=dt.date(2005, 1, 1),
+                                        max_date_allowed=dt.date.today(),
+                                        initial_visible_month=dt.date(dt.date.today().year, 1, 1),
+                                        clearable=True,
+                                    ),
+                                    width="auto",
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Button(
+                                            "About Graph",
+                                            id=f"popover-target-{PAGE}-{VIZ_ID}",
+                                            color="secondary",
+                                            size="sm",
+                                        ),
+                                    ],
                                     width="auto",
                                     style={"paddingTop": ".5em"},
                                 ),
                             ],
                             align="center",
+                            justify="between",
                         ),
                     ]
                 ),
@@ -113,7 +184,6 @@ time_to_first_response = dbc.Card(
         )
     ],
 )
-
 
 # callback for graph info popover
 @callback(
@@ -127,116 +197,301 @@ def toggle_popover(n, is_open):
     return is_open
 
 
-# callback for VIZ TITLE graph
+# callback for dynamically changing the graph title
+@callback(
+    Output(f"graph-title-{PAGE}-{VIZ_ID}", "children"),
+    Input(f"window-width-{PAGE}-{VIZ_ID}", "value"),
+)
+def graph_title(window_width):
+    title = f"Time to First Response"
+    return title
+
+
+# callback for lottery-factor-over-time graph
 @callback(
     Output(f"{PAGE}-{VIZ_ID}", "figure"),
-    # Output(f"check-alert-{PAGE}-{VIZ_ID}", "is_open"), USE WITH ADDITIONAL PARAMETERS
-    # if additional output is added, change returns accordingly
+    Output(f"check-alert-{PAGE}-{VIZ_ID}", "is_open"),
     [
         Input("repo-choices", "data"),
-        Input(f"date-radio-{PAGE}-{VIZ_ID}", "value"),
-        # add additional inputs here
+        Input(f"patterns-{PAGE}-{VIZ_ID}", "value"),
+        Input(f"threshold-{PAGE}-{VIZ_ID}", "value"),
+        Input(f"window-width-{PAGE}-{VIZ_ID}", "value"),
+        Input(f"step-size-{PAGE}-{VIZ_ID}", "value"),
+        Input(f"date-picker-range-{PAGE}-{VIZ_ID}", "start_date"),
+        Input(f"date-picker-range-{PAGE}-{VIZ_ID}", "end_date"),
     ],
     background=True,
 )
-def time_to_first_response_graph(repolist, interval):
-    # wait for data to asynchronously download and become available.
+def create_time_to_first_response_graph(
+    repolist, patterns, threshold, window_width, step_size, start_date, end_date
+):
+    # main function for all data pre processing
     cache = cm()
-    df = cache.grabm(func=ttfrq, repos=repolist)
+    df = cache.grabm(func=ctq, repos=repolist)
+
     while df is None:
         time.sleep(1.0)
-        df = cache.grabm(func=ttfrq, repos=repolist)
+        df = cache.grabm(func=ctq, repos=repolist)
 
+    # data ready.
     start = time.perf_counter()
     logging.warning(f"{VIZ_ID}- START")
 
     # test if there is data
     if df.empty:
         logging.warning(f"{VIZ_ID} - NO DATA AVAILABLE")
-        return nodata_graph
+        return nodata_graph, False
 
-    # function for all data pre processing, COULD HAVE ADDITIONAL INPUTS AND OUTPUTS
-    df, df_contribs = process_data(df, interval)
+    # if the step size is greater than window width raise Alert
+    if step_size > window_width:
+        return dash.no_update, True
 
-    fig = create_figure(df, df_contribs, interval)
+    df_final = process_data3(df, patterns, threshold, window_width, step_size, start_date, end_date)
+
+    fig = create_figure3(df_final, threshold, step_size)
 
     logging.warning(f"{VIZ_ID} - END - {time.perf_counter() - start}")
-    return fig
+    return fig, False
 
 
-def process_data(df: pd.DataFrame, interval):
+def process_data3(df, patterns, threshold, window_width, step_size, start_date, end_date):
+
+    # convert to datetime objects rather than strings
     df["created_at"] = pd.to_datetime(df["created_at"], utc=True)
-    df["closed_at"] = pd.to_datetime(df["closed_at"], utc=True)
 
-    created_range = pd.to_datetime(df["created"]).dt.to_period(interval).value_counts().sort_index()
+    # order values chronologically by created_at date
+    df = df.sort_values(by="created_at", ascending=True)
 
-    # converts to data frame object and creates date column from period values
-    df_contribs = created_range.to_frame().reset_index().rename(columns={"index": "Date", "created": "contribs"})
+    # if the start_date and/or the end date is not specified set them to the beginning and most recent created_at date
+    if start_date is None:
+        start_date = df["created_at"].min()
+    if end_date is None:
+        end_date = df["created_at"].max()
 
-    # converts date column to a datetime object, converts to string first to handle period information
+    if patterns:
+        # remove rows where Login column value contains the substring 'bot'
+        patterns_mask = df["login"].str.contains("|".join(patterns), na=False)
+        df = df[~patterns_mask]
 
-    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    #NEED TO SUBTRACT END DATE BY START DATE AND MAKE THAT THE Y AXIS VALUE+
-    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    df_contribs["created_at"] = pd.to_numeric(df_contribs["created_at"])
-    df_contribs["closed_at"] = pd.to_datetime(df_contribs["closed_at"].astype(str))
+    # threshold is an integer value eg. 10, 20,..., 90 since dcc.Slider only accepts integers as values
+    # divide by 100 to convert it to a decimal representation of a percentage eg. 0.10, 0.20,..., 0.90
+    threshold = threshold / 100
 
-    # correction for year binning -
-    # rounded up to next year so this is a simple patch
-    if interval == "Y":
-        df_contribs["Date"] = df_contribs["Date"].dt.year
-    elif interval == "M":
-        df_contribs["Date"] = df_contribs["Date"].dt.strftime("%Y-%m")
+    # create bins with a size equivalent to the the step size starting from the start date up to the end date
+    period_from = pd.date_range(start=start_date, end=end_date, freq=f"{step_size}m", inclusive="both")
+    # store the period_from dates in a df
+    df_final = period_from.to_frame(index=False, name="period_from")
+    # calculate the end of each interval and store the values in a column named period_from
+    df_final["period_to"] = df_final["period_from"] + pd.DateOffset(months=window_width)
 
-    return df, df_contribs
-
-
-def create_figure(df: pd.DataFrame, df_contribs, interval):
-    # time values for graph
-    x_r, x_name, hover, period = get_graph_time_values(interval)
-
-    if interval == -1:
-        fig = px.line(df, x="created_at", y=df.index, color_discrete_sequence=[color_seq[3]])
-        # fig.update_traces(hovertemplate="Contributors: %{y}<br>%{x|%b %d, %Y} <extra></extra>")
-    else:
-        fig = px.bar(
-            df_contribs,
-            x="Date",
-            y="Time to Respond",
-            range_x=x_r,
-            labels={"x": x_name, "y": "Contributors"},
-            color_discrete_sequence=[color_seq[3]],
+    # dynamically calculate the contributor prolificacy over time for each of the action times and store results in df_final
+    (
+        df_final["Commit"],
+        df_final["Issue Opened"],
+        df_final["Issue Comment"],
+        df_final["Issue Closed"],
+        df_final["PR Opened"],
+        df_final["PR Comment"],
+        df_final["PR Review"],
+    ) = zip(
+        *df_final.apply(
+            lambda row: ttfr_over_time(df, row.period_from, row.period_to, window_width, threshold), axis=1
         )
-        fig.update_traces(hovertemplate=hover + "<br>Contributors: %{y}<br>")
+    )
 
-    """
-        Ref. for this awesome button thing:
-        https://plotly.com/python/range-slider/
-    """
-    # add the date-range selector
-    fig.update_layout(
-        xaxis=dict(
-            rangeselector=dict(
-                buttons=list(
-                    [
-                        dict(count=1, label="1m", step="month", stepmode="backward"),
-                        dict(count=6, label="6m", step="month", stepmode="backward"),
-                        dict(count=1, label="YTD", step="year", stepmode="todate"),
-                        dict(count=1, label="1y", step="year", stepmode="backward"),
-                        dict(step="all"),
-                    ]
-                )
+    return df_final
+
+
+def create_figure3(df_final, threshold, step_size):
+    # create custom data to update the hovertemplate with the action type and start and end dates of a given time window in addition to the lottery factor
+    # make a nested list of plural action types so that it is gramatically correct in the updated hover info eg. Commit -> Commits and PR Opened -> PRs Opened
+    action_types = [
+        [action_type[:2] + "s" + action_type[2:]] * len(df_final)
+        if action_type == "PR Opened"
+        else [action_type[:5] + "s" + action_type[5:]] * len(df_final)
+        if action_type == "Issue Opened" or action_type == "Issue Closed"
+        else [action_type + "s"] * len(df_final)
+        for action_type in df_final.columns[2:]
+    ]
+    time_window = list(
+        df_final["period_from"].dt.strftime("%b %d, %Y") + " - " + df_final["period_to"].dt.strftime("%b %d, %Y")
+    )
+    customdata = np.stack(([threshold] * len(df_final), time_window), axis=-1)
+
+    # create plotly express line graph
+    fig = go.Figure(
+        [
+            go.Scatter(
+                name="Commit",
+                x=df_final["period_from"],
+                y=df_final["Commit"],
+                text=action_types[0],
+                customdata=customdata,
+                mode="lines",
+                showlegend=False,
+                marker=dict(color=color_seq[0]),
             ),
-            rangeslider=dict(visible=True),
-            type="date",
-        )
+            go.Scatter(
+                name="Issue Opened",
+                x=df_final["period_from"],
+                y=df_final["Issue Opened"],
+                text=action_types[1],
+                customdata=customdata,
+                mode="lines",
+                showlegend=False,
+                marker=dict(color=color_seq[1]),
+            ),
+            go.Scatter(
+                name="Issue Comment",
+                x=df_final["period_from"],
+                y=df_final["Issue Comment"],
+                text=action_types[2],
+                customdata=customdata,
+                mode="lines",
+                showlegend=False,
+                marker=dict(color=color_seq[2]),
+            ),
+            go.Scatter(
+                name="Issue Closed",
+                x=df_final["period_from"],
+                y=df_final["Issue Closed"],
+                text=action_types[3],
+                customdata=customdata,
+                mode="lines",
+                showlegend=False,
+                marker=dict(color=color_seq[3]),
+            ),
+            go.Scatter(
+                name="PR Opened",
+                x=df_final["period_from"],
+                y=df_final["PR Opened"],
+                text=action_types[4],
+                customdata=customdata,
+                mode="lines",
+                showlegend=True,
+                marker=dict(color=color_seq[4]),
+            ),
+            go.Scatter(
+                name="PR Comment",
+                x=df_final["period_from"],
+                y=df_final["PR Comment"],
+                text=action_types[5],
+                customdata=customdata,
+                mode="lines",
+                showlegend=True,
+                marker=dict(color=color_seq[5]),
+            ),
+            go.Scatter(
+                name="PR Review",
+                x=df_final["period_from"],
+                y=df_final["PR Review"],
+                text=action_types[6],
+                customdata=customdata,
+                mode="lines",
+                showlegend=True,
+                marker=dict(color=color_seq[0]),
+            ),
+        ],
     )
-    # label the figure correctly
+
+    # define x-axis and y-axis titles and intialize first x-axis tick to start at the user-inputted start_date
+    start_date = min(df_final["period_from"])
+
+    # update xaxes to display ticks, only show ticks every other year
+    fig.update_xaxes(
+        showgrid=True,
+        ticklabelmode="period",
+        tickangle=0,
+        dtick=f"M24",
+        tickformat="%b %Y",
+    )
+
+    # hover template styling
+    fig.update_traces(
+        textposition="top right",
+        hovertemplate="%{y} people contributing to<br>%{customdata[0]}% of %{text} from<br>%{customdata[1]}<br><extra></extra>",
+    )
+
+    # layout styling
     fig.update_layout(
-        xaxis_title="Time",
-        yaxis_title="Number of Contributors",
-        margin_b=40,
-        margin_r=20,
+        xaxis_title=f"Timeline (stepsize = {step_size} months)",
+        xaxis=dict(tick0=start_date),
+        yaxis_title="# of PR",
         font=dict(size=14),
+        margin_b=40,
+        legend_title="Action Type",
     )
+
     return fig
+
+
+def ttfr_over_time(df, period_from, period_to, window_width, threshold):
+    # subset df such that the rows correspond to the window of time defined by period from and period to
+    time_mask = (df["created_at"] >= period_from) & (df["created_at"] <= period_to)
+    df_in_range = df.loc[time_mask]
+
+    # initialize varibles to store contributor prolificacy accoding to action type
+    commit, issueOpened, issueComment, issueClosed, prOpened, prReview, prComment = (
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    # count the number of contributions each contributor has made according each action type
+    df_count_cntrbs = df_in_range.groupby(["Action", "cntrb_id"])["cntrb_id"].count().to_frame()
+    df_count_cntrbs = df_count_cntrbs.rename(columns={"cntrb_id": "count"}).reset_index()
+
+    # pivot df such that the column names correspond to the different action types, index is the cntrb_ids, and the values are the number of contributions of each contributor
+    df_count_cntrbs = df_count_cntrbs.pivot(index="cntrb_id", columns="Action", values="count")
+
+    commit = calc_lottery_factor3(df_count_cntrbs, "Commit", threshold)
+    issueOpened = calc_lottery_factor3(df_count_cntrbs, "Issue Opened", threshold)
+    issueComment = calc_lottery_factor3(df_count_cntrbs, "Issue Comment", threshold)
+    issueClosed = calc_lottery_factor3(df_count_cntrbs, "Issue Closed", threshold)
+    prOpened = calc_lottery_factor3(df_count_cntrbs, "PR Opened", threshold)
+    prReview = calc_lottery_factor3(df_count_cntrbs, "PR Review", threshold)
+    prComment = calc_lottery_factor3(df_count_cntrbs, "PR Comment", threshold)
+
+    return commit, issueOpened, issueComment, issueClosed, prOpened, prReview, prComment
+
+
+def calc_lottery_factor3(df, action_type, threshold):
+    # if the df is empty return None
+    if df.empty:
+        return None
+    
+    if action_type != "PR Opened":
+        return None
+
+    # if the specified action type is not in the dfs' cols return None
+    if action_type not in df.columns:
+        return None
+
+    # sort rows in df based on number of contributions from greatest to least
+    df = df.sort_values(by=action_type, ascending=False)
+
+    # calculate the threshold amount of contributions
+    thresh_cntrbs = df[action_type].sum() * threshold
+
+    # drop rows where the cntrb_id is None
+    mask = df.index.get_level_values("cntrb_id") == None
+    df = df[~mask]
+
+    # initilize running sum of contributors who make up contributor prolificacy
+    lottery_factor = 0
+
+    # initialize running sum of contributions
+    running_sum = 0
+
+    for _, row in df.iterrows():
+        running_sum += row[action_type]  # update the running sum by the number of contributions a contributor has made
+        lottery_factor += 1  # update contributor prolificacy
+        # if the running sum of contributions is greater than or equal to the threshold amount, break
+        if running_sum >= thresh_cntrbs:
+            break
+
+    return lottery_factor
