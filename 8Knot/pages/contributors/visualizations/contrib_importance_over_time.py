@@ -472,7 +472,8 @@ def calc_lottery_factor(df, action_type, threshold):
     # if the df is empty return None
     if df.empty:
         return None
-
+    #if action_type != "Commit":
+    #    return None
     # if the specified action type is not in the dfs' cols return None
     if action_type not in df.columns:
         return None
