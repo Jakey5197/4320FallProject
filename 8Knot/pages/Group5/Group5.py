@@ -7,6 +7,8 @@ from .visualizations.time_to_first_response import time_to_first_response
 from .visualizations.change_request_closure_ratio import change_request_closure_ratio
 from .visualizations.bus_factor import bus_factor
 from .visualizations.release_frequency import release_frequency
+from .visualizations.issue_response_time import issue_response_time
+from .visualizations.change_request_duration import change_request_duration
 
 warnings.filterwarnings("ignore")
 
@@ -27,6 +29,14 @@ layout = dbc.Container(
             [
                 dbc.Col(bus_factor, width=6),
                 dbc.Col(release_frequency, width=6),
+            ],
+            align="center",
+            style={"marginBottom": ".5%"},
+        ),
+        dbc.Row(
+            [
+                dbc.Col(issue_response_time, width=6),
+                dbc.Col(change_request_duration, width=6),
             ],
             align="center",
             style={"marginBottom": ".5%"},
